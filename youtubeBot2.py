@@ -9,25 +9,11 @@ import requests
 import os
 from dotenv import load_dotenv
 
-# Page configuration
+
 st.set_page_config(page_title="YouTube Video Chatbot", page_icon="🤖")
 
-# Load environment variables
+#
 load_dotenv()
-
-# API Key handling: Priority to Streamlit Secrets, then environment variables
-api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
-
-if not api_key:
-    st.sidebar.warning("⚠️ GOOGLE_API_KEY not found in secrets or .env")
-    api_key = st.sidebar.text_input("Enter your Google API Key", type="password")
-
-if not api_key:
-    st.info("Please provide a Google API Key to continue.")
-    st.stop()
-
-os.environ["GOOGLE_API_KEY"] = api_key
-
 def get_transcript(url):
     ydl_opts = {
         'skip_download': True,
@@ -45,13 +31,12 @@ def get_transcript(url):
             subs = info.get("requested_subtitles")
             
             if not subs or "en" not in subs:
-                # Try fallback: some videos have 'en-US' or similar
+                
                 available_subs = info.get("subtitles") or info.get("automatic_captions")
                 if available_subs:
                     for lang in ['en', 'en-US', 'en-GB']:
                         if lang in available_subs:
-                            # This is a bit complex for a simple script, 
-                            # sticking to basic 'en' for now or returning None
+                        
                             pass
                 return None
             
@@ -60,7 +45,7 @@ def get_transcript(url):
             response.raise_for_status()
             data = response.text
             
-            # Simple VTT/SRT parsing to text
+         
             lines = [line for line in data.split("\n") if "-->" not in line and line.strip() and not line.isdigit()]
             return " ".join(lines)
     except Exception as e:
@@ -73,11 +58,11 @@ def build_vectorstore(transcript):
         return None
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     docs = splitter.create_documents([transcript])
-    embeddings = GoogleGenerativeAIEmbeddings(model='models/embedding-001')
+    embeddings = GoogleGenerativeAIEmbeddings(model='gemini-embedding-001')
     vector_store = FAISS.from_documents(docs, embeddings)
     return vector_store
 
-# Prompt Template
+
 prompt = PromptTemplate(
     template="""
 You are a helpful assistant answering questions from a YouTube video transcript.
@@ -102,12 +87,12 @@ if "messages" not in st.session_state:
 
 url = st.text_input("Enter YouTube Video URL:", placeholder="https://www.youtube.com/watch?v=...")
 
-# Clear retriever if URL changes
+
 if "last_url" not in st.session_state or st.session_state.last_url != url:
     if "retriever" in st.session_state:
         del st.session_state.retriever
     st.session_state.last_url = url
-    st.session_state.messages = [] # Reset chat for new video
+    st.session_state.messages = [] 
 
 if url:
     if "retriever" not in st.session_state:
@@ -123,7 +108,7 @@ if url:
             else:
                 st.error("❌ Could not find English subtitles for this video.")
 
-# Initialize LLM
+
 llm = ChatGoogleGenerativeAI(model='gemini-1.5-flash')
 parser = StrOutputParser()
 
@@ -152,12 +137,11 @@ def ask_question(question):
         "question": question
     })
 
-# Display chat messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# Chat input
+
 if user_input := st.chat_input("Ask about the video..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
