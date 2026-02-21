@@ -8,11 +8,8 @@ import yt_dlp
 import requests
 import os
 from dotenv import load_dotenv
-
-
+import re
 st.set_page_config(page_title="YouTube Video Chatbot", page_icon="🤖")
-
-#
 load_dotenv()
 def get_transcript(url):
     ydl_opts = {
@@ -29,24 +26,40 @@ def get_transcript(url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             subs = info.get("requested_subtitles")
+            sub_url = None
             
-            if not subs or "en" not in subs:
+            if subs and "en" in subs:
+                sub_url = subs["en"]["url"]
+            else:
+             
+                available = info.get("subtitles") or {}
+                auto_caps = info.get("automatic_captions") or {}
+                combined = {**auto_caps, **available}
                 
-                available_subs = info.get("subtitles") or info.get("automatic_captions")
-                if available_subs:
-                    for lang in ['en', 'en-US', 'en-GB']:
-                        if lang in available_subs:
-                        
-                            pass
-                return None
+                for lang_code in ["en", "en-US", "en-GB", "en-CA", "en-IN"]:
+                    if lang_code in combined:
+                        formats = combined[lang_code]
+                        sub_url = next((f["url"] for f in formats if f.get("ext") == "vtt"), formats[0]["url"])
+                        break
             
-            sub_url = subs["en"]["url"]
+            if not sub_url:
+                return None
+
             response = requests.get(sub_url)
             response.raise_for_status()
             data = response.text
             
          
-            lines = [line for line in data.split("\n") if "-->" not in line and line.strip() and not line.isdigit()]
+            lines = []
+            for line in data.split("\n"):
+                line = line.strip()
+             
+                if (line.startswith("WEBVTT") or "-->" in line or line.isdigit() or not line):
+                    continue
+                
+                line = re.sub(r'<[^>]*>', '', line)
+                lines.append(line)
+                
             return " ".join(lines)
     except Exception as e:
         st.error(f"Error fetching transcript: {e}")
@@ -92,7 +105,7 @@ if "last_url" not in st.session_state or st.session_state.last_url != url:
     if "retriever" in st.session_state:
         del st.session_state.retriever
     st.session_state.last_url = url
-    st.session_state.messages = [] 
+    st.session_state.messages = []
 
 if url:
     if "retriever" not in st.session_state:
@@ -108,8 +121,8 @@ if url:
             else:
                 st.error("❌ Could not find English subtitles for this video.")
 
-
-llm = ChatGoogleGenerativeAI(model='gemini-1.5-flash')
+# Initialize LLM
+llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
 parser = StrOutputParser()
 
 def format_docs(docs):
@@ -136,6 +149,7 @@ def ask_question(question):
         "context": context,
         "question": question
     })
+
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
