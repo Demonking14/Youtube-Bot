@@ -16,7 +16,7 @@ def get_transcript(url):
         'skip_download': True,
         'writesubtitles': True,
         'writeautomaticsub': True,
-        'subtitleslangs': ['en'],
+        'subtitleslangs': ['en', 'hi'],
         'quiet': True,
         'no_warnings': True,
         'force_ipv4': True
@@ -30,13 +30,15 @@ def get_transcript(url):
             
             if subs and "en" in subs:
                 sub_url = subs["en"]["url"]
+            elif subs and "hi" in subs:
+                sub_url = subs["hi"]["url"]
             else:
              
                 available = info.get("subtitles") or {}
                 auto_caps = info.get("automatic_captions") or {}
                 combined = {**auto_caps, **available}
                 
-                for lang_code in ["en", "en-US", "en-GB", "en-CA", "en-IN"]:
+                for lang_code in ["en", "en-US", "en-GB", "en-CA", "en-IN", "hi", "hi-IN"]:
                     if lang_code in combined:
                         formats = combined[lang_code]
                         sub_url = next((f["url"] for f in formats if f.get("ext") == "vtt"), formats[0]["url"])
@@ -93,7 +95,7 @@ Answer only using the provided context. If the answer is not in the context, say
 )
 
 st.title("📺 YouTube Video Chatbot")
-st.markdown("Chat with any YouTube video that has English subtitles/captions.")
+st.markdown("Chat with any YouTube video that has English or Hindi subtitles/captions.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -119,7 +121,7 @@ if url:
                 else:
                     st.error("❌ Failed to process transcript.")
             else:
-                st.error("❌ Could not find English subtitles for this video.")
+                st.error("❌ Could not find English or Hindi subtitles for this video.")
 
 # Initialize LLM
 llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
